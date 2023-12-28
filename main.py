@@ -15,7 +15,6 @@ clock = pygame.time.Clock()
 
 # Window initialization
 pygame.display.set_caption('Ghosts')
-# screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), flags=pygame.SCALED, vsync=1)
 
 # Object making
@@ -40,9 +39,9 @@ async def main():
 
         # Draw the frame
         screen.fill(BACKGROUND)
-        pygame.draw.rect(screen, (100,100,128), pygame.Rect(75, 100, SCREEN_WIDTH - 150, SCREEN_HEIGHT-75))
-        pygame.draw.rect(screen, (128,128,128), floor)
+        pygame.draw.rect(screen, (50,50,75), pygame.Rect(75, 100, SCREEN_WIDTH - 150, SCREEN_HEIGHT-75))
         player.draw(screen)
+        pygame.draw.rect(screen, (75,75,75), floor)
 
 
         pygame.display.flip()
