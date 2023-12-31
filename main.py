@@ -3,18 +3,23 @@ from pygame.locals import *
 from pygame.sprite import Group
 
 # Program constants
-SCREEN_WIDTH = 800
+SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 600
 FPS = 60
 BACKGROUND = (0, 0, 0)
 LIVE_COLOR = (255, 255, 255)
 
 # Classes
+class Sprite(pygame.sprite.Sprite):
+    def __init__(self, startx, starty):
+        super().__init__()
+
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, startx, starty):
         super().__init__()
         # Player set up
-        self.surf = pygame.Surface((40, 120))
+        self.surf = pygame.Surface((60, 120))
         self.surf.fill(LIVE_COLOR)
         self.rect = self.surf.get_rect()
         self.rect.center = [startx, starty]
@@ -33,7 +38,7 @@ class Player(pygame.sprite.Sprite):
         self.facing = 1
         self.bullets: list[projectile] = []
         self.shot_time = 0
-        self.shot_delay = 0.8
+        self.shot_delay = 0.6
 
     def reset(self):
         self.__init__()
@@ -109,11 +114,11 @@ class Player(pygame.sprite.Sprite):
             bullet.draw(screen)
         screen.blit(self.surf, self.rect)
 
-class projectile(object):
+class projectile():
     def __init__(self, x, y, facing):
         self.x = x
         self.y = y
-        self.radius = 4
+        self.radius = 6
         self.color = (255,215,0)
         self.facing = facing
         self.vel = facing * 10
@@ -126,12 +131,12 @@ class projectile(object):
     def draw(self,screen):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.radius)
 
-class Ghost(pygame.sprite.Sprite):
+class Zombie(pygame.sprite.Sprite):
     def __init__(self, distance = 50):
         super().__init__()
         # Enemy set up
-        self.surf = pygame.Surface((40, 120))
-        self.surf.fill((128,128,128))
+        self.surf = pygame.Surface((60, 120))
+        self.surf.fill((100,128,100))
         self.rect = self.surf.get_rect()
         starty = floor.top - 10
         if random.randint(1,2) == 1: startx = -distance
@@ -140,21 +145,21 @@ class Ghost(pygame.sprite.Sprite):
 
         # Enemy attributes
         self.health = 50
-        self.speed = 1.5
+        self.speed = 1.2
         self.accel = 0.15
         self.facing = 1
         self.gravity = 0.5
         self.vsp = 0
         self.drag = 1
         self.hsp = 0
-        self.damage = 25
+        self.damage = 20
         self.knock = 10
         self.attack_time = 0
         self.attack_delay = 0.5
 
     def hit(self, damage, knock):
         self.health -= damage
-        print(f"Enemy Health: {self.health}, hit with knock: {knock}")
+        print(f"Zombie Health: {self.health}")
         if self.health <= 0: self.kill()
         self.hsp = knock
         self.vsp = -abs(knock)
@@ -181,6 +186,55 @@ class Ghost(pygame.sprite.Sprite):
     def draw(self, screen):
         screen.blit(self.surf, self.rect)
 
+class Ghost(pygame.sprite.Sprite):
+    def __init__(self, distance = 50):
+        super().__init__()
+        # Enemy set up
+        self.surf = pygame.Surface((60, 120))
+        self.surf.fill((128,128,128))
+        self.rect = self.surf.get_rect()
+        starty = 150
+        if random.randint(1,2) == 1: startx = -distance
+        else: startx = SCREEN_WIDTH + distance
+        self.rect.bottomleft = [startx, starty]
+
+        # Enemy attributes
+        self.health = 30
+        self.speed = 2
+        self.accel = 0.08
+        self.facing = 1
+        self.drag = 1
+        self.hsp = 0
+        self.damage = 15
+        self.knock = 10
+        self.attack_time = 0
+        self.attack_delay = 0.5
+
+    def hit(self, damage, knock):
+        self.health -= damage
+        print(f"Ghost Health: {self.health}")
+        if self.health <= 0: self.kill()
+        self.hsp = knock
+        
+    def update(self, floor):
+        now = time.time()
+
+        if player.health > 0 and now - self.attack_time > self.attack_delay:
+            if self.rect.right < player.rect.centerx:
+                self.facing = 1
+                if self.hsp < self.speed: self.hsp += self.speed * self.accel
+            elif self.rect.left > player.rect.centerx:
+                self.facing = -1
+                if self.hsp > -self.speed: self.hsp += -self.speed * self.accel
+        else: self.hsp = 0
+
+        if self.rect.bottom < floor.top - 15 and self.rect.centerx < SCREEN_WIDTH and self.rect.centerx > 0: 
+            self.rect.bottom += 0.8
+        self.rect.move_ip(self.hsp, 0)
+
+    def draw(self, screen):
+        screen.blit(self.surf, self.rect)
+
 # Game initialization
 pygame.init()
 clock = pygame.time.Clock()
@@ -195,6 +249,7 @@ wall = pygame.Rect(75, 100, SCREEN_WIDTH - 150, SCREEN_HEIGHT-75)
 player = Player(SCREEN_WIDTH/2, 400)
 enemies = pygame.sprite.Group()
 enemies.add(Ghost(0))
+enemies.add(Zombie(0))
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
 all_sprites.add(enemies)
@@ -205,8 +260,9 @@ def reset():
         enemy.kill()
     player.kill()
     player.__init__(SCREEN_WIDTH/2, 400)
-    for i in range(1,11):
+    for i in range(0,5):
         enemies.add(Ghost(i * 123))
+        enemies.add(Zombie(i * 200))
     all_sprites.add(player)
     all_sprites.add(enemies)
 
