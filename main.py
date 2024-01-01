@@ -6,20 +6,33 @@ from pygame.sprite import Group
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 600
 FPS = 60
-BACKGROUND = (0, 0, 0)
-LIVE_COLOR = (255, 255, 255)
+BLACK = (0,0,0)
+WHITE = (255,255,255)
+DARK_GRAY = (75,75,75)
+DARK_BLUE = (50,50,75)
+GRAY = (128,128,128)
+GREEN = (100,128,100)
+YELLOW = (255,215,0)
+
+
 
 # Classes
 class Sprite(pygame.sprite.Sprite):
-    def __init__(self, width, height, color, center, name = 'Sprite'):
+    def __init__(self, size, color, center, name = 'Sprite'):
+        # Object set up
         super().__init__()
-        self.width = width
-        self.height = height
+        self.width = size[0]
+        self.height = size[1]
         self.surf = pygame.Surface((self.width, self.height))
         self.rect = self.surf.get_rect()
         self.surf.fill(color)
         self.rect.center = center
         self.name = name
+        self.health = 1
+        self.vsp = 0
+        self.hsp = 0
+        self.attack_time = 0
+        self.facing = 1
 
     def draw(self, screen: pygame.Surface):
         screen.blit(self.surf, self.rect)
@@ -31,17 +44,16 @@ class Sprite(pygame.sprite.Sprite):
         self.hsp = knock
         self.vsp = -abs(knock)
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self, startx, starty):
-        super().__init__()
-        # Player set up
-        self.width = 60
-        self.height = 120
-        self.surf = pygame.Surface((self.width, self.height))
-        self.surf.fill(LIVE_COLOR)
-        self.rect = self.surf.get_rect()
-        self.rect.center = [startx, starty]
+class Player(Sprite):
+    def __init__(self, center):
+        # Object set up
+        size = (60,120)
+        color = WHITE
+        super().__init__(size, color, center, 'Player')
+
+        # Background attributes
         self.prev_key = pygame.key.get_pressed()
+        self.bullets: list[projectile] = []
 
         # Player attributes
         self.health = 100
@@ -50,12 +62,7 @@ class Player(pygame.sprite.Sprite):
         self.jumpspeed = 15
         self.min_jumpspeed = 3
         self.gravity = 0.8
-        self.vsp = 0
         self.drag = 1
-        self.hsp = 0
-        self.facing = 1
-        self.bullets: list[projectile] = []
-        self.shot_time = 0
         self.shot_delay = 0.6
     
     def update(self, keys, floor):
@@ -84,7 +91,7 @@ class Player(pygame.sprite.Sprite):
         if self.rect.left < 0: self.rect.left = 0
         elif self.rect.right > SCREEN_WIDTH: self.rect.right = SCREEN_WIDTH
 
-        # variable height jumping
+        # Variable height jumping
         if self.prev_key[pygame.K_SPACE] and not keys[pygame.K_SPACE]:
             if self.vsp < -self.min_jumpspeed:
                 self.vsp = -self.min_jumpspeed
@@ -93,40 +100,31 @@ class Player(pygame.sprite.Sprite):
         # Gravity
         if self.vsp < 10 and not onground: self.vsp += self.gravity
         if self.vsp > 0 and onground: self.vsp = 0
-        # Drag
+        # Horizontal drag
         if self.hsp > 0 and not keys[pygame.K_d]: self.hsp -= self.drag
         elif self.hsp < 0 and not keys[pygame.K_a]: self.hsp += self.drag
 
-        self.move(self.hsp,self.vsp)
+        # Move the Character and the bullets
+        self.rect.move_ip(self.hsp,self.vsp)
         for bullet in self.bullets:
             bullet.update()
 
     def check_collision(self, x, y, object):
+        # Checks to see if will collide before colliding
         self.rect.move_ip([x,y])
         collide = pygame.rect.Rect.colliderect(self.rect, object)
         self.rect.move_ip([-x,-y])
         if collide and self.rect.bottom >= object.top:
             self.rect.bottom = object.top
-            # self.vsp = 0
         return collide
-
-    def move(self, x, y):
-        self.rect.move_ip([x,y])
 
     def shoot(self):
         now = time.time()
-        if now - self.shot_time > self.shot_delay:
+        # Shoots a bullet if shot delay time has passed
+        if now - self.attack_time > self.shot_delay:
             height = (self.rect.centery+self.rect.top)/2
-            new_bullet = projectile(self.rect.centerx,height, self.facing)
-            self.bullets.append(new_bullet)
-            self.shot_time = now
-
-    def get_hit(self, damage, knock):
-        self.health -= damage
-        print(f"Player Health: {self.health}, get_hit with knock: {knock}")
-        if self.health <= 0: self.kill()
-        self.hsp = knock
-        self.vsp = -abs(knock)
+            self.bullets.append(projectile((self.rect.centerx,height), self.facing))
+            self.attack_time = now
 
     def draw(self, screen):
         for bullet in self.bullets:
@@ -134,59 +132,50 @@ class Player(pygame.sprite.Sprite):
         screen.blit(self.surf, self.rect)
 
 class projectile():
-    def __init__(self, x, y, facing):
-        self.x = x
-        self.y = y
+    def __init__(self, center, facing):
+        # Object set up
+        self.x = center[0]
+        self.y = center[1]
         self.radius = 6
-        self.color = (255,215,0)
+        self.color = YELLOW
         self.facing = facing
-        self.vel = facing * 10
+
+        # Active attributes
+        self.vel = 10
         self.damage = 20
         self.knock = 5
 
     def update(self):
-        self.x += self.vel
+        self.x += self.vel * self.facing
 
     def draw(self,screen):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.radius)
 
-class Zombie(pygame.sprite.Sprite):
-    def __init__(self, distance = 50):
-        super().__init__()
-        # Enemy set up
-        self.surf = pygame.Surface((60, 120))
-        self.surf.fill((100,128,100))
-        self.rect = self.surf.get_rect()
-        starty = floor.top - 10
-        if random.randint(1,2) == 1: startx = -distance
-        else: startx = SCREEN_WIDTH + distance
-        self.rect.bottomleft = [startx, starty]
+class Zombie(Sprite):
+    def __init__(self, distance = 50, side = random.randrange(-1,2,2)):
+        # Object set up
+        size = (60,120)
+        color = GREEN
+        if side == 1: startx = SCREEN_WIDTH + distance # Defines on which side of screen the entity will spawn
+        else: startx = -distance
+        starty = floor.top - size[1] - 10
+        super().__init__(size, color, (startx,starty), 'Zombie')
 
-        # Enemy attributes
+        # Active attributes
         self.health = 50
         self.speed = 1.2
         self.accel = 0.15
-        self.facing = 1
         self.gravity = 0.5
-        self.vsp = 0
         self.drag = 1
-        self.hsp = 0
         self.damage = 20
         self.knock = 10
-        self.attack_time = 0
         self.attack_delay = 0.5
-
-    def get_hit(self, damage, knock):
-        self.health -= damage
-        print(f"Zombie Health: {self.health}")
-        if self.health <= 0: self.kill()
-        self.hsp = knock
-        self.vsp = -abs(knock)
         
     def update(self, floor):
         onground = self.rect.bottom >= floor.top
         now = time.time()
 
+        # Will walk towards the player except after attacking
         if player.health > 0 and now - self.attack_time > self.attack_delay:
             if self.rect.right < player.rect.centerx:
                 self.facing = 1
@@ -202,42 +191,30 @@ class Zombie(pygame.sprite.Sprite):
 
         self.rect.move_ip(self.hsp, self.vsp)
 
-    def draw(self, screen):
-        screen.blit(self.surf, self.rect)
-
-class Ghost(pygame.sprite.Sprite):
-    def __init__(self, distance = 50):
-        super().__init__()
+class Ghost(Sprite):
+    def __init__(self, distance = 50, side = random.randrange(-1,2,2)):
         # Enemy set up
-        self.surf = pygame.Surface((60, 120))
-        self.surf.fill((128,128,128))
-        self.rect = self.surf.get_rect()
+        size = (60,120)
+        color = GRAY
+        if side == 1: startx = SCREEN_WIDTH + distance # Defines on which side of screen the entity will spawn
+        else: startx = -distance
         starty = 150
-        if random.randint(1,2) == 1: startx = -distance
-        else: startx = SCREEN_WIDTH + distance
-        self.rect.bottomleft = [startx, starty]
+        super().__init__(size, color, (startx,starty), 'Ghost')
 
-        # Enemy attributes
+        # Active attributes
         self.health = 30
         self.speed = 2
         self.accel = 0.08
-        self.facing = 1
         self.drag = 1
-        self.hsp = 0
+        self.float_height = 20
         self.damage = 15
         self.knock = 10
-        self.attack_time = 0
         self.attack_delay = 0.5
-
-    def get_hit(self, damage, knock):
-        self.health -= damage
-        print(f"Ghost Health: {self.health}")
-        if self.health <= 0: self.kill()
-        self.hsp = knock
         
     def update(self, floor):
         now = time.time()
 
+        # Will float towards the player except after attacking
         if player.health > 0 and now - self.attack_time > self.attack_delay:
             if self.rect.right < player.rect.centerx:
                 self.facing = 1
@@ -247,53 +224,38 @@ class Ghost(pygame.sprite.Sprite):
                 if self.hsp > -self.speed: self.hsp += -self.speed * self.accel
         else: self.hsp = 0
 
-        if self.rect.bottom < floor.top - 15 and self.rect.centerx < SCREEN_WIDTH and self.rect.centerx > 0: 
+        # Once on screen, floats down from start height to float height
+        if self.rect.bottom < (floor.top - self.float_height) and self.rect.centerx < SCREEN_WIDTH and self.rect.centerx > 0: 
             self.rect.bottom += 0.8
+
         self.rect.move_ip(self.hsp, 0)
 
-    def draw(self, screen):
-        screen.blit(self.surf, self.rect)
-
-class Spider(pygame.sprite.Sprite):
-    def __init__(self, distance = 50):
-        super().__init__()
+class Spider(Sprite):
+    def __init__(self, distance = 50, side = random.randrange(-1,2,2)):
         # Enemy set up
-        self.surf = pygame.Surface((90, 50))
-        self.surf.fill((0,0,0))
-        self.rect = self.surf.get_rect()
-        starty = floor.top - 10
-        if random.randint(1,2) == 1:
-            startx = -distance # Spawn Left Side
-            self.facing = 1
-        else:
-            startx = SCREEN_WIDTH + distance # Spawn Right Side
-            self.facing = -1
-        self.rect.bottomleft = [startx, starty]
+        size = (90,50)
+        color = BLACK
+        if side == 1: startx = SCREEN_WIDTH + distance # Determines which side of screen the entity will spawn on
+        else: startx = -distance
+        starty = floor.top - size[1] - 10
+        super().__init__(size, color, (startx,starty), 'Spider')
+        self.facing = -side
 
-        # Enemy attributes
+        # Entity attributes
         self.health = 50
         self.speed = 2.5
         self.accel = 0.15
         self.gravity = 0.5
-        self.vsp = 0
         self.drag = 1
-        self.hsp = 0
         self.damage = 20
         self.knock = 10
-        self.attack_time = 0
         self.attack_delay = 0.5
-
-    def get_hit(self, damage, knock):
-        self.health -= damage
-        print(f"Spider Health: {self.health}")
-        if self.health <= 0: self.kill()
-        self.hsp = knock
-        self.vsp = -abs(knock)
         
     def update(self, floor):
         onground = self.rect.bottom >= floor.top
         now = time.time()
 
+        # Walks in a constant direction across the screen until it leaves the screen
         if player.health > 0:
             if self.facing == 1:
                 if self.hsp < self.speed: self.hsp += self.speed * self.accel
@@ -309,8 +271,7 @@ class Spider(pygame.sprite.Sprite):
 
         self.rect.move_ip(self.hsp, self.vsp)
 
-    def draw(self, screen):
-        screen.blit(self.surf, self.rect)
+
 
 # Game initialization
 pygame.init()
@@ -323,9 +284,14 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), flags=pygame.SCA
 # Object making
 floor = pygame.Rect(0, 450, SCREEN_WIDTH, SCREEN_HEIGHT - 400)
 wall = pygame.Rect(75, 100, SCREEN_WIDTH - 150, SCREEN_HEIGHT-75)
-player = Player(SCREEN_WIDTH/2, 400)
+player = Player((SCREEN_WIDTH/2, 400))
 enemies = pygame.sprite.Group()
-enemies.add(Zombie())
+enemies.add(Zombie(0,1))
+enemies.add(Zombie(0,-1))
+enemies.add(Ghost(200,-1))
+enemies.add(Ghost(200,1))
+enemies.add(Spider(400,-1))
+enemies.add(Spider(400,1))
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
 all_sprites.add(enemies)
@@ -335,21 +301,28 @@ def reset():
     for enemy in enemies:
         enemy.kill()
     player.kill()
-    player.__init__(SCREEN_WIDTH/2, 400)
+    player.__init__((SCREEN_WIDTH/2, 400))
 
     # Test wave
-    for i in range(0,4):
+    spawned = []
+    for i in range(0,5):
         type = random.randint(1,3)
         dist = i * 175
         match type:
             case 1:
                 enemies.add(Zombie(dist))
+                spawned.append('Zombie')
             case 2:
                 enemies.add(Ghost(dist))
+                spawned.append('Ghost')
             case 3:
                 enemies.add(Spider(dist))
+                spawned.append('Spider')
+    print(spawned)
     all_sprites.add(player)
     all_sprites.add(enemies)
+
+
 
 # Game loop
 async def main():
@@ -395,7 +368,7 @@ async def main():
             enemy.update(floor)
 
         # Draw the frame
-        screen.fill(BACKGROUND)
+        screen.fill(BLACK)
         pygame.draw.rect(screen, (50,50,75), wall)
         for entity in all_sprites:
             entity.draw(screen)
