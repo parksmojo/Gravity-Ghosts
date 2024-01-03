@@ -78,13 +78,13 @@ class Player(Sprite):
                 self.facing = 1
                 if keys[pygame.K_LSHIFT]: self.hsp = self.sprint
                 else: self.hsp = self.speed
-            if keys[pygame.K_SPACE] and onground:
+            if keys[pygame.K_w] and onground:
                 self.vsp = -self.jumpspeed
-            if keys[pygame.K_k]:
+            if keys[pygame.K_SPACE]:
                 self.shoot()
-            if keys[pygame.K_LCTRL]:
+            if keys[pygame.K_s]:
                 self.rect.height = self.height / 2
-            elif self.prev_key[pygame.K_LCTRL] and not keys[pygame.K_LCTRL]:
+            elif not keys[pygame.K_s] and self.prev_key[pygame.K_s]:
                 self.rect.height = self.height
 
         # Location correction
@@ -92,7 +92,7 @@ class Player(Sprite):
         elif self.rect.right > SCREEN_WIDTH: self.rect.right = SCREEN_WIDTH
 
         # Variable height jumping
-        if self.prev_key[pygame.K_SPACE] and not keys[pygame.K_SPACE]:
+        if self.prev_key[pygame.K_w] and not keys[pygame.K_w]:
             if self.vsp < -self.min_jumpspeed:
                 self.vsp = -self.min_jumpspeed
         self.prev_key = keys
@@ -152,7 +152,7 @@ class projectile():
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.radius)
 
 class Zombie(Sprite):
-    def __init__(self, distance = 50, side = random.randrange(-1,2,2)):
+    def __init__(self, side = random.randrange(-1,2,2), distance = 50):
         # Object set up
         size = (60,120)
         color = GREEN
@@ -192,7 +192,7 @@ class Zombie(Sprite):
         self.rect.move_ip(self.hsp, self.vsp)
 
 class Ghost(Sprite):
-    def __init__(self, distance = 50, side = random.randrange(-1,2,2)):
+    def __init__(self, side = random.randrange(-1,2,2), distance = 50):
         # Enemy set up
         size = (60,120)
         color = GRAY
@@ -231,7 +231,7 @@ class Ghost(Sprite):
         self.rect.move_ip(self.hsp, 0)
 
 class Spider(Sprite):
-    def __init__(self, distance = 50, side = random.randrange(-1,2,2)):
+    def __init__(self, side = random.randrange(-1,2,2), distance = 50):
         # Enemy set up
         size = (90,50)
         color = BLACK
@@ -273,6 +273,52 @@ class Spider(Sprite):
 
 
 
+class Waves():
+    def __init__(self):
+        self.num = 0
+        self.total_waves = 6
+
+    def load_wave(self, wave_num):
+        mobs = set()
+        match wave_num:
+            case 1:
+                mobs.add(Zombie())
+            case 2:
+                mobs.add(Zombie(-1))
+                mobs.add(Zombie(1))
+                mobs.add(Zombie(-1, 200))
+                mobs.add(Zombie(1, 400))
+            case 3:
+                mobs.add(Ghost())
+            case 4:
+                mobs.add(Ghost(-1))
+                mobs.add(Ghost(1))
+                mobs.add(Ghost(-1, 200))
+                mobs.add(Ghost(1, 400))
+            case 5:
+                mobs.add(Spider())
+            case 6:
+                mobs.add(Spider(1, 50))
+                mobs.add(Spider(1, 350))
+                mobs.add(Spider(1, 650))
+                mobs.add(Spider(-1, 950))
+                mobs.add(Spider(-1, 1250))
+                
+        return mobs
+
+    def start_wave(self, wave_num = None):
+        if self.num >= self.total_waves:
+            print(f"Cannot start wave {self.num + 1}, it does not exist!")
+            return
+        if wave_num == None: wave_num = self.num = self.num + 1
+
+        entities = self.load_wave(wave_num)
+        for entity in entities:
+            enemies.add(entity)
+        all_sprites.add(enemies)        
+
+
+
 # Game initialization
 pygame.init()
 clock = pygame.time.Clock()
@@ -286,39 +332,19 @@ floor = pygame.Rect(0, 450, SCREEN_WIDTH, SCREEN_HEIGHT - 400)
 wall = pygame.Rect(75, 100, SCREEN_WIDTH - 150, SCREEN_HEIGHT-75)
 player = Player((SCREEN_WIDTH/2, 400))
 enemies = pygame.sprite.Group()
-enemies.add(Zombie(0,1))
-enemies.add(Zombie(0,-1))
-enemies.add(Ghost(200,-1))
-enemies.add(Ghost(200,1))
-enemies.add(Spider(400,-1))
-enemies.add(Spider(400,1))
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
 all_sprites.add(enemies)
+wave = Waves()
+# wave.num = 5
 
-# Character creation, in a function to allow resetting
+# Reset to beginning
 def reset():
     for enemy in enemies:
         enemy.kill()
     player.kill()
     player.__init__((SCREEN_WIDTH/2, 400))
-
-    # Test wave
-    spawned = []
-    for i in range(0,5):
-        type = random.randint(1,3)
-        dist = i * 175
-        match type:
-            case 1:
-                enemies.add(Zombie(dist))
-                spawned.append('Zombie')
-            case 2:
-                enemies.add(Ghost(dist))
-                spawned.append('Ghost')
-            case 3:
-                enemies.add(Spider(dist))
-                spawned.append('Spider')
-    print(spawned)
+    wave.num = 0
     all_sprites.add(player)
     all_sprites.add(enemies)
 
@@ -329,7 +355,7 @@ async def main():
     round_done = False
     running = True
     while running:
-        # Dealing with events
+        # Dealing with events and game-wide inputs
         for event in pygame.event.get():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
@@ -337,8 +363,11 @@ async def main():
                 elif event.key == K_r:
                     reset()
                     round_done = False
-                elif event.key == K_p:
-                    print(f'Enemies left: {len(enemies.sprites())}')
+                elif event.key == K_f and round_done:
+                    wave.start_wave()
+                    round_done = False
+                elif event.key == K_p: # Debug printout
+                    print(f'Wave: {wave.num}, Player Health: {player.health}, Enemies left: {len(enemies.sprites())}')
             elif event.type == QUIT:
                 running = False
 
@@ -348,7 +377,6 @@ async def main():
                 if enemy.rect.collidepoint(bullet.x,bullet.y):
                     enemy.get_hit(bullet.damage, bullet.facing * bullet.knock)
                     player.bullets.pop(player.bullets.index(bullet))
-                    # print(f"Enemies left: {len(enemies.sprites())}")
 
             if player.rect.colliderect(enemy.rect):
                 if player.health > 0:
@@ -356,7 +384,8 @@ async def main():
                     if now - enemy.attack_time > enemy.attack_delay:
                         player.get_hit(enemy.damage, enemy.facing * enemy.knock)
                         enemy.attack_time = now
-            
+
+        # Checking if finished wave
         if len(enemies.sprites()) == 0 and not round_done:
             print("Round Won!")
             round_done = True

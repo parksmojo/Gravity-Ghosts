@@ -1,0 +1,29 @@
+Development Plan:
+
+simple enemy waves
+- initial 3-5
+
+drops
+- Zombies drop ammo, ghosts health, something like that
+
+health readout etc
+- can use the floor space?
+- or other creative way of showing information
+
+finish waves
+- probably like 10?
+
+Main menu and polishing
+- tutorial text
+- wave separation
+- add images
+- flush out scene
+
+Make a way to save game progress between play sessions
+
+After mob waves game becomes a platformer
+- player can now exit sides or above
+- more guns/shooting types
+- puzzles
+
+Endgame??
